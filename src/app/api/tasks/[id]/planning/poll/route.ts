@@ -155,15 +155,21 @@ async function handlePlanningCompletion(taskId: string, parsed: any, messages: a
     }
   }
 
-  // Trigger dispatch - use localhost since we're in the same process
+  // Trigger dispatch
   if (firstAgentId && !skipDispatch) {
-    const dispatchUrl = `http://localhost:${process.env.PORT || 3000}/api/tasks/${taskId}/dispatch`;
+    const missionControlUrl = process.env.MISSION_CONTROL_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const dispatchUrl = `${missionControlUrl}/api/tasks/${taskId}/dispatch`;
     console.log(`[Planning Poll] Triggering dispatch: ${dispatchUrl}`);
 
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (process.env.MC_API_TOKEN) {
+        headers.Authorization = `Bearer ${process.env.MC_API_TOKEN}`;
+      }
+
       const dispatchRes = await fetch(dispatchUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
       });
 
       if (dispatchRes.ok) {

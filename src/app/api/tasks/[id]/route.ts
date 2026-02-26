@@ -184,7 +184,7 @@ export async function PATCH(
       if (existing.assigned_agent_id) affectedAgentIds.add(existing.assigned_agent_id);
       if (validatedData.assigned_agent_id) affectedAgentIds.add(validatedData.assigned_agent_id);
 
-      for (const agentId of affectedAgentIds) {
+      for (const agentId of Array.from(affectedAgentIds)) {
         const agent = queryOne<{ id: string; name: string; status: string }>(
           'SELECT id, name, status FROM agents WHERE id = ?',
           [agentId]

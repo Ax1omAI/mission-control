@@ -4,6 +4,7 @@ import { broadcast } from '@/lib/events';
 import { chromium } from 'playwright';
 import { existsSync, realpathSync } from 'fs';
 import path from 'path';
+import type { TaskDeliverable } from '@/lib/types';
 
 function expandHome(p: string): string {
   return p.replace(/^~/, process.env.HOME || '');
@@ -75,7 +76,7 @@ export async function POST(
       LIMIT 1
     `).get(taskId, pdfPath) as { id: string } | undefined;
 
-    let createdDeliverable: unknown = existingPdf;
+    let createdDeliverable: TaskDeliverable | { id: string } | undefined = existingPdf;
     if (!existingPdf) {
       const newId = crypto.randomUUID();
       db.prepare(`
@@ -89,12 +90,16 @@ export async function POST(
         'Generated from HTML deliverable'
       );
 
-      createdDeliverable = db.prepare(`SELECT * FROM task_deliverables WHERE id = ?`).get(newId);
+      createdDeliverable = db
+        .prepare(`SELECT * FROM task_deliverables WHERE id = ?`)
+        .get(newId) as TaskDeliverable | undefined;
 
-      broadcast({
-        type: 'deliverable_added',
-        payload: createdDeliverable,
-      });
+      if (createdDeliverable) {
+        broadcast({
+          type: 'deliverable_added',
+          payload: createdDeliverable,
+        });
+      }
     }
 
     return NextResponse.json({

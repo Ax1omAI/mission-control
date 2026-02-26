@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://missioncontrol.ghray.com"><strong>🎮 Live Demo</strong></a> •
+  <a href="https://github.com/CHARLIEDINGES/mission-control"><strong>GitHub Repo</strong></a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-docker">Docker</a> •
   <a href="#-features">Features</a> •
@@ -516,11 +516,11 @@ Mission Control is built by a growing community. Thank you to everyone who has c
 
 ## ⭐ Star History
 
-<a href="https://www.star-history.com/#crshdn/mission-control&Date">
+<a href="https://www.star-history.com/#CHARLIEDINGES/mission-control&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=crshdn/mission-control&type=Date" width="600" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=CHARLIEDINGES/mission-control&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=CHARLIEDINGES/mission-control&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=CHARLIEDINGES/mission-control&type=Date" width="600" />
   </picture>
 </a>
 

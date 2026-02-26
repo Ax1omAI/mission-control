@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus } from 'lucide-react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, AlertTriangle } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import { ActivityLog } from './ActivityLog';
@@ -185,6 +185,17 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
                 {tab.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Dispatch error banner */}
+        {task?.planning_dispatch_error && (
+          <div className="mx-4 mt-4 p-3 border border-amber-500/40 bg-amber-500/10 rounded-md text-amber-300 text-sm flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+            <div>
+              <div className="font-medium">Dispatch failed</div>
+              <div className="text-amber-200/90">{task.planning_dispatch_error}</div>
+            </div>
           </div>
         )}
 

@@ -260,9 +260,32 @@ export async function PATCH(
       fetch(`${missionControlUrl}/api/tasks/${id}/dispatch`, {
         method: 'POST',
         headers,
-      }).catch(err => {
-        console.error('Auto-dispatch failed:', err);
-      });
+      })
+        .then(async (res) => {
+          if (res.ok) return;
+
+          const errorText = await res.text().catch(() => 'Unknown dispatch error');
+          const message = `Auto-dispatch failed (${res.status}): ${errorText}`;
+          run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [message, new Date().toISOString(), id]);
+
+          const taskAfterError = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+          if (taskAfterError) {
+            broadcast({ type: 'task_updated', payload: taskAfterError });
+          }
+
+          console.error(message);
+        })
+        .catch(err => {
+          const message = `Auto-dispatch failed: ${err instanceof Error ? err.message : String(err)}`;
+          run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [message, new Date().toISOString(), id]);
+
+          const taskAfterError = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+          if (taskAfterError) {
+            broadcast({ type: 'task_updated', payload: taskAfterError });
+          }
+
+          console.error(message);
+        });
     }
 
     return NextResponse.json(task);

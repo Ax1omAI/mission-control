@@ -19,6 +19,7 @@ interface RouteParams {
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
+    const now = new Date().toISOString();
 
     // Get task with agent info
     const task = queryOne<Task & { assigned_agent_name?: string; workspace_id: string }>(
@@ -50,6 +51,27 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Assigned agent not found' }, { status: 404 });
     }
 
+    const recordDispatchError = (message: string) => {
+      run('UPDATE tasks SET planning_dispatch_error = ?, updated_at = ? WHERE id = ?', [message, now, id]);
+
+      run(
+        `INSERT INTO task_activities (id, task_id, agent_id, activity_type, message, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), id, agent.id, 'status_changed', `Dispatch failed: ${message}`, now]
+      );
+
+      run(
+        `INSERT INTO events (id, type, task_id, agent_id, message, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [uuidv4(), 'task_status_changed', id, agent.id, `Dispatch failed for ${agent.name}: ${message}`, now]
+      );
+
+      const updatedTask = queryOne<Task>('SELECT * FROM tasks WHERE id = ?', [id]);
+      if (updatedTask) {
+        broadcast({ type: 'task_updated', payload: updatedTask });
+      }
+    };
+
     // Check if dispatching to the master agent while there are other orchestrators available
     if (agent.is_master) {
       // Check for other master agents in the same workspace (excluding this one)
@@ -68,6 +90,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
 
       if (otherOrchestrators.length > 0) {
+        const message = `Other orchestrators available: ${otherOrchestrators.map(o => o.name).join(', ')}`;
+        recordDispatchError(message);
         return NextResponse.json({
           success: false,
           warning: 'Other orchestrators available',
@@ -84,6 +108,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         await client.connect();
       } catch (err) {
         console.error('Failed to connect to OpenClaw Gateway:', err);
+        recordDispatchError('Failed to connect to OpenClaw Gateway');
         return NextResponse.json(
           { error: 'Failed to connect to OpenClaw Gateway' },
           { status: 503 }
@@ -96,8 +121,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       'SELECT * FROM openclaw_sessions WHERE agent_id = ? AND status = ?',
       [agent.id, 'active']
     );
-
-    const now = new Date().toISOString();
 
     if (!session) {
       // Create session record
@@ -124,6 +147,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     if (!session) {
+      recordDispatchError('Failed to create agent session');
       return NextResponse.json(
         { error: 'Failed to create agent session' },
         { status: 500 }
@@ -179,9 +203,9 @@ If you need help or clarification, ask the orchestrator.`;
         idempotencyKey: `dispatch-${task.id}-${Date.now()}`
       });
 
-      // Update task status to in_progress
+      // Update task status to in_progress and clear dispatch error
       run(
-        'UPDATE tasks SET status = ?, updated_at = ? WHERE id = ?',
+        'UPDATE tasks SET status = ?, planning_dispatch_error = NULL, updated_at = ? WHERE id = ?',
         ['in_progress', now, id]
       );
 
@@ -225,6 +249,7 @@ If you need help or clarification, ask the orchestrator.`;
       });
     } catch (err) {
       console.error('Failed to send message to agent:', err);
+      recordDispatchError(`Failed to send message to agent: ${(err as Error).message}`);
       return NextResponse.json(
         { error: 'Internal server error' },
         { status: 500 }

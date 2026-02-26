@@ -6,7 +6,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { FileText, Link as LinkIcon, Package, ExternalLink, Eye } from 'lucide-react';
+import { FileText, Link as LinkIcon, Package, ExternalLink, Eye, FolderSearch } from 'lucide-react';
 import { debug } from '@/lib/debug';
 import type { TaskDeliverable } from '@/lib/types';
 
@@ -50,47 +50,49 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
   };
 
   const handleOpen = async (deliverable: TaskDeliverable) => {
+    if (!deliverable.path) return;
+
     // URLs open directly in new tab
-    if (deliverable.deliverable_type === 'url' && deliverable.path) {
+    if (deliverable.deliverable_type === 'url') {
       window.open(deliverable.path, '_blank');
       return;
     }
 
-    // Files - try to open in Finder
-    if (deliverable.path) {
-      try {
-        debug.file('Opening file in Finder', { path: deliverable.path });
-        const res = await fetch('/api/files/reveal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filePath: deliverable.path }),
-        });
+    // For files, prefer in-dashboard/browser-accessible preview/download endpoint
+    const previewUrl = `/api/files/preview?path=${encodeURIComponent(deliverable.path)}`;
+    const downloadUrl = `/api/files/download?path=${encodeURIComponent(deliverable.path)}&raw=true`;
 
-        if (res.ok) {
-          debug.file('Opened in Finder successfully');
-          return;
-        }
-
-        const error = await res.json();
-        debug.file('Failed to open', error);
-
-        if (res.status === 404) {
-          alert(`File not found:\n${deliverable.path}\n\nThe file may have been moved or deleted.`);
-        } else if (res.status === 403) {
-          alert(`Cannot open this location:\n${deliverable.path}\n\nPath is outside allowed directories.`);
-        } else {
-          throw new Error(error.error || 'Unknown error');
-        }
-      } catch (error) {
-        console.error('Failed to open file:', error);
-        // Fallback: copy path to clipboard
-        try {
-          await navigator.clipboard.writeText(deliverable.path);
-          alert(`Could not open Finder. Path copied to clipboard:\n${deliverable.path}`);
-        } catch {
-          alert(`File path:\n${deliverable.path}`);
-        }
+    try {
+      debug.file('Opening file preview endpoint', { path: deliverable.path });
+      const probe = await fetch(previewUrl, { method: 'GET' });
+      if (probe.ok) {
+        window.open(previewUrl, '_blank');
+      } else {
+        // Fallback for non-previewable file types
+        window.open(downloadUrl, '_blank');
       }
+    } catch (error) {
+      console.error('Failed to open file in browser:', error);
+      window.open(downloadUrl, '_blank');
+    }
+  };
+
+  const handleReveal = async (deliverable: TaskDeliverable) => {
+    if (!deliverable.path) return;
+
+    try {
+      const res = await fetch('/api/files/reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filePath: deliverable.path }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error?.error || 'Failed to reveal file');
+      }
+    } catch {
+      alert('Could not reveal file location on this server.');
     }
   };
 
@@ -159,7 +161,7 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
               )}
               <div className="flex items-center gap-1">
                 {/* Preview button for HTML files */}
-                {deliverable.deliverable_type === 'file' && deliverable.path?.endsWith('.html') && (
+                {deliverable.deliverable_type === 'file' && /\.html?$/i.test(deliverable.path || '') && (
                   <button
                     onClick={() => handlePreview(deliverable)}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent-cyan"
@@ -168,14 +170,24 @@ export function DeliverablesList({ taskId }: DeliverablesListProps) {
                     <Eye className="w-4 h-4" />
                   </button>
                 )}
-                {/* Open/Reveal button */}
+                {/* Open button */}
                 {deliverable.path && (
                   <button
                     onClick={() => handleOpen(deliverable)}
                     className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-accent"
-                    title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Reveal in Finder'}
+                    title={deliverable.deliverable_type === 'url' ? 'Open URL' : 'Open in browser'}
                   >
                     <ExternalLink className="w-4 h-4" />
+                  </button>
+                )}
+                {/* Reveal on server button (local desktop/server only) */}
+                {deliverable.deliverable_type === 'file' && deliverable.path && (
+                  <button
+                    onClick={() => handleReveal(deliverable)}
+                    className="flex-shrink-0 p-1.5 hover:bg-mc-bg-tertiary rounded text-mc-text-secondary"
+                    title="Reveal on server"
+                  >
+                    <FolderSearch className="w-4 h-4" />
                   </button>
                 )}
               </div>

@@ -7,6 +7,8 @@
  * NEVER commit hardcoded IPs, paths, or sensitive data!
  */
 
+import { getCoreTeamSettings } from '@/lib/runtime-settings';
+
 export interface MissionControlConfig {
   // Workspace settings
   workspaceBasePath: string; // e.g., ~/Documents/Shared
@@ -132,15 +134,11 @@ export function getMissionControlUrl(): string {
  * and avoids persisting auto-generated helper agents.
  */
 export function isCoreTeamLockEnabled(): boolean {
-  return (process.env.CORE_TEAM_LOCK || '').toLowerCase() === 'true';
+  return getCoreTeamSettings().enabled;
 }
 
 export function getCoreTeamNames(): string[] {
-  const raw = process.env.CORE_TEAM_AGENT_NAMES || 'Axiom,Anvil,Beacon,Forge';
-  return raw
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return getCoreTeamSettings().names;
 }
 
 /**

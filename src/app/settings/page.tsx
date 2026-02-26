@@ -7,7 +7,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Settings, Save, RotateCcw, Home, FolderOpen, Link as LinkIcon } from 'lucide-react';
+import { Settings, Save, RotateCcw, FolderOpen, Link as LinkIcon, Shield } from 'lucide-react';
 import { getConfig, updateConfig, resetConfig, type MissionControlConfig } from '@/lib/config';
 
 export default function SettingsPage() {
@@ -16,9 +16,26 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [coreTeamLockEnabled, setCoreTeamLockEnabled] = useState(false);
+  const [coreTeamNames, setCoreTeamNames] = useState('Axiom,Anvil,Beacon,Forge');
 
   useEffect(() => {
     setConfig(getConfig());
+
+    (async () => {
+      try {
+        const res = await fetch('/api/settings/core-team-lock');
+        if (res.ok) {
+          const data = await res.json();
+          setCoreTeamLockEnabled(!!data.enabled);
+          if (Array.isArray(data.names) && data.names.length > 0) {
+            setCoreTeamNames(data.names.join(','));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load core team settings', err);
+      }
+    })();
   }, []);
 
   const handleSave = async () => {
@@ -30,6 +47,21 @@ export default function SettingsPage() {
 
     try {
       updateConfig(config);
+
+      const res = await fetch('/api/settings/core-team-lock', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: coreTeamLockEnabled,
+          names: coreTeamNames,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to save core team settings');
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -39,10 +71,26 @@ export default function SettingsPage() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm('Reset all settings to defaults? This cannot be undone.')) {
       resetConfig();
       setConfig(getConfig());
+      setCoreTeamLockEnabled(false);
+      setCoreTeamNames('Axiom,Anvil,Beacon,Forge');
+
+      try {
+        await fetch('/api/settings/core-team-lock', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: false,
+            names: 'Axiom,Anvil,Beacon,Forge',
+          }),
+        });
+      } catch (err) {
+        console.error('Failed to reset core team settings', err);
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     }
@@ -204,6 +252,45 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* Core Team Lock */}
+        <section className="mb-8 p-6 bg-mc-bg-secondary border border-mc-border rounded-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield className="w-5 h-5 text-mc-accent" />
+            <h2 className="text-xl font-semibold text-mc-text">Core Team Lock</h2>
+          </div>
+          <p className="text-sm text-mc-text-secondary mb-4">
+            Keep only your core agents visible/active. Planner-created helper agents won’t be persisted when enabled.
+          </p>
+
+          <div className="space-y-4">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={coreTeamLockEnabled}
+                onChange={(e) => setCoreTeamLockEnabled(e.target.checked)}
+                className="w-4 h-4 accent-mc-accent"
+              />
+              <span className="text-sm text-mc-text">Enable Core Team Lock</span>
+            </label>
+
+            <div>
+              <label className="block text-sm font-medium text-mc-text mb-2">
+                Core Team Agent Names (comma-separated)
+              </label>
+              <input
+                type="text"
+                value={coreTeamNames}
+                onChange={(e) => setCoreTeamNames(e.target.value)}
+                placeholder="Axiom,Anvil,Beacon,Forge"
+                className="w-full px-4 py-2 bg-mc-bg border border-mc-border rounded text-mc-text focus:border-mc-accent focus:outline-none"
+              />
+              <p className="text-xs text-mc-text-secondary mt-1">
+                Example: Axiom, Anvil, Beacon, Forge
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Environment Variables Note */}
         <section className="p-6 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <h3 className="text-lg font-semibold text-blue-400 mb-2">
@@ -218,6 +305,8 @@ export default function SettingsPage() {
             <li><code>PROJECTS_PATH</code> - Projects directory</li>
             <li><code>OPENCLAW_GATEWAY_URL</code> - Gateway WebSocket URL</li>
             <li><code>OPENCLAW_GATEWAY_TOKEN</code> - Gateway auth token</li>
+            <li><code>CORE_TEAM_LOCK</code> - Enable core-team-only mode at startup</li>
+            <li><code>CORE_TEAM_AGENT_NAMES</code> - Comma-separated core agent names</li>
           </ul>
           <p className="text-xs text-blue-400 mt-3">
             Environment variables take precedence over UI settings for server-side operations.

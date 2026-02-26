@@ -124,6 +124,23 @@ export async function PATCH(
       updates.push('assigned_agent_id = ?');
       values.push(validatedData.assigned_agent_id);
 
+      // Inbox auto-advance: assigning an inbox task moves it to assigned automatically
+      // unless caller explicitly set a different status in this same request.
+      if (
+        validatedData.assigned_agent_id &&
+        validatedData.status === undefined &&
+        existing.status === 'inbox'
+      ) {
+        updates.push('status = ?');
+        values.push('assigned');
+
+        run(
+          `INSERT INTO events (id, type, task_id, message, created_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [uuidv4(), 'task_status_changed', id, `Task "${existing.title}" auto-moved to assigned after assignment`, now]
+        );
+      }
+
       if (validatedData.assigned_agent_id) {
         const agent = queryOne<Agent>('SELECT name FROM agents WHERE id = ?', [validatedData.assigned_agent_id]);
         if (agent) {
@@ -133,8 +150,13 @@ export async function PATCH(
             [uuidv4(), 'task_assigned', validatedData.assigned_agent_id, id, `"${existing.title}" assigned to ${agent.name}`, now]
           );
 
-          // Auto-dispatch if already in assigned status or being assigned now
-          if (existing.status === 'assigned' || validatedData.status === 'assigned') {
+          // Auto-dispatch if already in assigned status, being set to assigned,
+          // or inbox auto-advanced to assigned above.
+          if (
+            existing.status === 'assigned' ||
+            validatedData.status === 'assigned' ||
+            (validatedData.status === undefined && existing.status === 'inbox')
+          ) {
             shouldDispatch = true;
           }
         }

@@ -20,7 +20,7 @@ node --version  # Should be v20+
 
 ```bash
 cd /var/www
-git clone https://github.com/CHARLIEDINGES/mission-control.git mission-control-demo
+git clone https://github.com/Ax1omAI/mission-control.git mission-control-demo
 cd mission-control-demo
 ```
 

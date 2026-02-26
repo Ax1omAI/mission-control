@@ -128,7 +128,7 @@ export async function PATCH(
       // unless caller explicitly set a different status in this same request.
       if (
         validatedData.assigned_agent_id &&
-        validatedData.status === undefined &&
+        (validatedData.status === undefined || validatedData.status === 'inbox') &&
         existing.status === 'inbox'
       ) {
         updates.push('status = ?');
@@ -155,7 +155,7 @@ export async function PATCH(
           if (
             existing.status === 'assigned' ||
             validatedData.status === 'assigned' ||
-            (validatedData.status === undefined && existing.status === 'inbox')
+            ((validatedData.status === undefined || validatedData.status === 'inbox') && existing.status === 'inbox')
           ) {
             shouldDispatch = true;
           }
